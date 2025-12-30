@@ -1,6 +1,6 @@
 # ZNN-ASMC-Mobile-Manipulator
 
-Official code for the paper (Under Review) :**"Motion Planning and Tracking Control of Mobile Manipulator under Floating-Base Disturbances"**
+Official code for the paper (Under Review. The manuscript title has been updated in the revised resubmission) :**"Zeroing Neural Network-Based Motion Planning and Adaptive Sliding Mode Tracking Control for Mobile Manipulators"**
 
 The project simulates the motion planning and tracking control of a mobile manipulator under floating-base disturbances using **MuJoCo**. It features a **Zeroing Neural Network (ZNN)** for real-time kinematic planning and an **Adaptive Sliding Mode Controller (ASMC)** based on Time-Delay Estimation (TDE) for robust dynamic control.
 
