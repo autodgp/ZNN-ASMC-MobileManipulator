@@ -19,7 +19,8 @@ plt.rcParams['mathtext.rm'] = 'Times New Roman'
 
 plot_data = {
     'joint_angles': [], 'joint_velocities': [],
-    'joint_torques': [], 'position_errors': [], 'timesteps': []
+    'joint_torques': [], 'position_errors': [], 'timesteps': [],
+    'sliding_variables': []
 }
 
 def add_trajectory_line(viewer, position, color=[0, 0, 0, 1], width=2.5):
@@ -97,7 +98,7 @@ for i in range(t):
     error_q = q_target - data.qpos[1:7]
     error_q_dot = q_dot_target - data.qvel[1:7]
 
-    adaptive_param, phi_hat_t_minus_L, tau,sum_sign = floating_timedelay_asmc(
+    adaptive_param, phi_hat_t_minus_L, tau,sum_sign,s_val = floating_timedelay_asmc(
         sum_sign, data, tau, q_ddot_target, error_q, error_q_dot,
         error_q_t_minus_L, error_q_dot_t_minus_L, phi_hat_t_minus_L, adaptive_param)
 
@@ -108,10 +109,11 @@ for i in range(t):
     actual_traj.append(ee_pos)
     add_trajectory_line(viewer, actual_traj, [1, 0, 0, 1])
 
-    viewer.sync()
+    #viewer.sync()
     #time.sleep(dt)
 
     error_q_t_minus_L, error_q_dot_t_minus_L = error_q.copy(), error_q_dot.copy()
+    plot_data['sliding_variables'].append(s_val.copy())
     plot_data['joint_angles'].append(data.qpos[1:7].copy())
     plot_data['joint_velocities'].append(data.qvel[1:7].copy())
     plot_data['joint_torques'].append(data.ctrl[1:7].copy())
@@ -177,6 +179,38 @@ plt.xticks(fontsize=15, fontname='Times New Roman')
 plt.yticks(fontsize=15, fontname='Times New Roman')
 plt.tight_layout()
 plt.savefig(os.path.join(save_dir, 'floating_dyanamics_errors_xyz_.png'))
+
+# --------- Sliding Variables ---------
+plt.figure(figsize=(6, 4.5), dpi=300)  
+for i in range(6):
+        values = [d[i] for d in plot_data['sliding_variables']]
+        plt.plot(plot_data['timesteps'], values,
+                linestyle=line_styles[i % len(line_styles)],
+                linewidth=1.5,
+                label=rf'$s_{i + 1}$')
+            
+plt.xlabel('Time (s)', fontsize=15, fontname='Times New Roman')
+plt.ylabel(r'$s$ ', fontsize=15, fontname='Times New Roman')
+plt.xticks(fontsize=15, fontname='Times New Roman')
+plt.yticks(fontsize=15, fontname='Times New Roman')
+
+plt.grid(True, linestyle=':', linewidth=0.5)
+plt.xlim([0, 10])
+plt.legend(loc='upper right',prop=legend_font)
+# inset
+ax = plt.gca()
+axins = inset_axes(ax, width="30%", height="30%", loc='upper right',
+                 bbox_to_anchor=(-0.8, -0.5, 1.5, 1.5), bbox_transform=ax.transAxes)
+for i in range(6):
+    values = [d[i] for d in plot_data['sliding_variables']]
+    axins.plot(plot_data['timesteps'], values,
+            linestyle=line_styles[i % len(line_styles)], linewidth=1.)
+    axins.set_xlim(4, 6)
+    axins.set_ylim(-0.1, 0.1)
+    axins.grid(True, linestyle=':', linewidth=0.5)
+    mark_inset(ax, axins, loc1=3, loc2=4, fc="none", ec="0.5", linewidth=0.6, alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_dir, 'floating_sliding_variables.png'))
 
 
 # --------- Joint Angles and Velocities ---------

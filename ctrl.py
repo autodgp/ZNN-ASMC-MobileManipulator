@@ -104,7 +104,7 @@ def floating_timedelay_asmc(sum_sign, sim,tau,qd_ddot,error,error_dot,error_t_mi
             adaptive_param_new[j] -= (1.0 / dt) * abs(s[j]) * adaptive_param_new[j] / epsilon
         if adaptive_param_new[j] < 0:
             adaptive_param_new[j] = 0.0
-    return adaptive_param_new, phi_hat,tau,sum_sign
+    return adaptive_param_new, phi_hat,tau,sum_sign,s
     
 def online_timedelay_asmc(sum_sign, sim,tau,qd_ddot,error,error_dot,error_t_minus_L,error_dot_t_minus_L,phi_hat_t_minus_L,adaptive_param):
     """
@@ -145,4 +145,4 @@ def online_timedelay_asmc(sum_sign, sim,tau,qd_ddot,error,error_dot,error_t_minu
             adaptive_param_new[j] -= (1.0 / dt) * abs(s[j]) * adaptive_param_new[j] / epsilon
         if adaptive_param_new[j] < 0:
             adaptive_param_new[j] = 0.0
-    return adaptive_param_new, phi_hat,tau,sum_sign
+    return adaptive_param_new, phi_hat,tau,sum_sign, s

@@ -12,22 +12,57 @@ from ctrl import online_timedelay_asmc
 import os
 import matplotlib.pyplot as plt
 
+
 plt.rcParams['font.family'] = 'Times New Roman'         
 plt.rcParams['mathtext.fontset'] = 'stix'               
 plt.rcParams['mathtext.rm'] = 'Times New Roman'         
 
 plot_data = {
     'joint_angles': [], 'joint_velocities': [],
-    'joint_torques': [], 'position_errors': [], 'timesteps': []
+    'joint_torques': [], 'position_errors': [], 'timesteps': [],
+    'sliding_variables': []
 }
 
 def plot_joint_data(data, save_fig=True,save_dir='planning_control_realtime',filename_prefix='joint_data'):
     titles = ['Joint Angles', 'Joint Velocities', 'Joint Torques', 'Joints Tracking Errors']
     keys = ['joint_angles', 'joint_velocities', 'joint_torques', 'position_errors']
-    ylabels = [r'$q$ (rad)', r'$\dot{q}$ (rad/s)', r'$\tau$ (N·m) ', r'$e$ (rad) ']
+    ylabels = [r'$q$ (rad)', r'$\dot{q}$ (rad/s)', r'$\tau$ (N·m) ', r'$e$ (rad) ', r'$s$']
     line_styles = ['-', '--', '-.', ':', '-', '--']
     markers = ['o', 's', '^', 'x', 'D', '*']
     legend_font = FontProperties(family='Times New Roman', size=15) 
+
+    #sliding variables
+    plt.figure(figsize=(6, 4.5), dpi=300)  
+    for i in range(6):
+            values = [d[i] for d in data['sliding_variables']]
+            plt.plot(data['timesteps'], values,
+                     linestyle=line_styles[i % len(line_styles)],
+                     linewidth=1.5,
+                     label=rf'$s_{i + 1}$')
+            
+    plt.xlabel('Time (s)', fontsize=15, fontname='Times New Roman')
+    plt.ylabel(ylabels[4], fontsize=15, fontname='Times New Roman')
+    plt.xticks(fontsize=15, fontname='Times New Roman')
+    plt.yticks(fontsize=15, fontname='Times New Roman')
+
+    plt.grid(True, linestyle=':', linewidth=0.5)
+    plt.xlim([0, 10])
+    plt.legend(loc='upper right',prop=legend_font)
+    # inset
+    ax = plt.gca()
+    axins = inset_axes(ax, width="30%", height="30%", loc='upper right',
+                   bbox_to_anchor=(-0.8, -0.96, 1.5, 1.5), bbox_transform=ax.transAxes)
+    for i in range(6):
+        values = [d[i] for d in data['sliding_variables']]
+        axins.plot(data['timesteps'], values,
+               linestyle=line_styles[i % len(line_styles)], linewidth=1.)
+    axins.set_xlim(6, 8)
+    axins.set_ylim(-0.03,0.06)
+    axins.grid(True, linestyle=':', linewidth=0.5)
+    mark_inset(ax, axins, loc1=1, loc2=2, fc="none", ec="0.5", linewidth=0.6, alpha=0.5)
+    plt.tight_layout()
+    if save_fig:
+         plt.savefig(f'{save_dir}/realtime_sliding_variables.png')
 
     #joint angles
     plt.figure(figsize=(6, 4.5), dpi=300)  
@@ -47,7 +82,8 @@ def plot_joint_data(data, save_fig=True,save_dir='planning_control_realtime',fil
     plt.xlim([0, 10])
     plt.legend(loc='upper right',prop=legend_font)
     plt.tight_layout()
-
+    if save_fig:
+         plt.savefig(f'{save_dir}/realtime_joint_angles.png')
 
     #joint velocities
     plt.figure(figsize=(6, 4.5), dpi=300) 
@@ -79,7 +115,8 @@ def plot_joint_data(data, save_fig=True,save_dir='planning_control_realtime',fil
     axins.set_ylim(-0.2, 0.2)
     axins.grid(True, linestyle=':', linewidth=0.5)
     mark_inset(ax, axins, loc1=1, loc2=2, fc="none", ec="0.5", linewidth=0.6, alpha=0.5)
-
+    if save_fig:
+         plt.savefig(f'{save_dir}/realtime_joint_velocities.png')
 
     #joint torques
     plt.figure(figsize=(6, 4.5), dpi=300)
@@ -249,7 +286,6 @@ def plot_joint_data(data, save_fig=True,save_dir='planning_control_realtime',fil
             tick.set_fontname('Times New Roman')
             tick.set_fontsize(10)
         mark_inset(ax, axins, loc1=3, loc2=4, fc="none", ec="0.5", linewidth=0.6, alpha=0.5)
-
     plt.savefig(f'{save_dir}/realtime_target_errors.png')
 
 def add_trajectory_line(viewer, position, color=[0, 0, 0, 1], width=2.5):
@@ -269,6 +305,28 @@ def compute_jacobian(model, data, ee_site_id):
     mujoco.mj_jacSite(model, data, jacp, jacr, ee_site_id)
     return np.vstack((jacp[:, :6], jacr[:, :6]))
 
+
+def PT_AF(alpha):
+    gamma, a1, a2, w = 1, 1, 1, 3
+    k1 = 2 / gamma * w
+    k2 = (0.5)**(1 - gamma/2) * (2*a1) / (gamma * w * np.sqrt(a1*a2))
+    k3 = (0.5)**(1 + gamma/2) * 3**(gamma/2) * 2 * a2 / (gamma * w * np.sqrt(a1*a2))
+    return k1*alpha + k2*np.abs(alpha)**(1 - gamma/2)*np.sign(alpha) + k3*np.abs(alpha)**(1 + gamma/2)*np.sign(alpha)
+
+def L_AF(alpha):
+    return alpha
+
+def PE_AF(alpha):
+    k = 0.8
+    return alpha +  abs(alpha)**k * np.sign(alpha)
+
+def DPE_AF(alpha):
+    k = 2/3
+    return alpha +  abs(alpha)**k * np.sign(alpha) + abs(alpha)**(1/k) * np.sign(alpha)
+
+def SBP_AF(alpha):
+    beta = 0.65
+    return 0.5 * (np.abs(alpha)**beta + np.abs(alpha)**(1/beta)) * np.sign(alpha)
 
 def Adaptive_SBP_AF(alpha, adaptive_param, dt=0.001):  
     beta = 0.8
@@ -422,7 +480,7 @@ for k in range(N-1):
     error_q = q_target - data.qpos[:6]
     error_q_dot = q_dot_target - data.qvel[:6]
 
-    adaptive_param, phi_hat_t_minus_L, tau,sum_sign = online_timedelay_asmc(
+    adaptive_param, phi_hat_t_minus_L, tau,sum_sign,s_val = online_timedelay_asmc(
         sum_sign, data, tau, q_ddot_target, error_q, error_q_dot,
         error_q_t_minus_L, error_q_dot_t_minus_L, phi_hat_t_minus_L, adaptive_param)
     
@@ -431,11 +489,12 @@ for k in range(N-1):
     ee_pos = data.site_xpos[model.site('ee_tip').id].copy()
     actual_traj.append(ee_pos)
     add_trajectory_line(viewer, actual_traj, [1, 0, 0, 1], width=4)
-    viewer.sync()
+    #viewer.sync()
     #time.sleep(dt)
 
     # Data Logging
     error_q_t_minus_L, error_q_dot_t_minus_L = error_q.copy(), error_q_dot.copy()
+    plot_data['sliding_variables'].append(s_val.copy())
     plot_data['joint_angles'].append(data.qpos[:6].copy())
     plot_data['joint_velocities'].append(data.qvel[:6].copy())
     plot_data['joint_torques'].append(data.ctrl[:6].copy())
