@@ -1,0 +1,4 @@
+realtime_compare_data/
+__pycache__/
+*.pyc
+.vscode/
